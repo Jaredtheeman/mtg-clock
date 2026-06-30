@@ -1,4 +1,4 @@
-const CACHE = 'mtg-clock-v1';
+const CACHE = 'mtg-clock-v17';
 const ASSETS = [
   './',
   './index.html',
@@ -25,9 +25,19 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Fetch: cache-first, fall back to network
+// Fetch: cache-first, then network — and runtime-cache successful GETs
+// (so the web fonts persist for offline use after the first online load).
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    caches.match(e.request).then(cached =>
+      cached || fetch(e.request).then(resp => {
+        try {
+          const copy = resp.clone();
+          caches.open(CACHE).then(c => c.put(e.request, copy));
+        } catch (_) {}
+        return resp;
+      }).catch(() => cached)
+    )
   );
 });

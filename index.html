@@ -2,12 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0a0a16">
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Spectral:wght@500;700&display=swap" rel="stylesheet">
   <title>MTG Life &amp; Clock</title>
   <style>
     *, *::before, *::after {
@@ -18,197 +21,245 @@
     :root {
       --p1-bg:  #140b2a;
       --p2-bg:  #0b1a2e;
-      --mid-bg: #060610;
-      --active: rgba(0,190,90,0.13);
+      --mid-bg: #05050d;
       --gold:   #d4af37;
       --red:    #e94560;
+      --blue:   #2f7ad1;
       --text:   #f0f0f0;
-      --muted:  rgba(255,255,255,0.38);
+      --muted:  rgba(255,255,255,0.40);
+      --font-disp: 'Cinzel', Georgia, 'Times New Roman', serif;
+      --font-ui:   'Spectral', 'Iowan Old Style', Georgia, system-ui, serif;
+      --font-mono: ui-monospace, 'SF Mono', 'Consolas', 'Roboto Mono', monospace;
     }
-    html, body { height: 100%; overflow: hidden; background: #0a0a16; }
+    html, body { height: 100%; overflow: hidden; background: #000; }
     body {
       display: flex; flex-direction: column;
       height: 100dvh;
       color: var(--text);
-      font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+      font-family: var(--font-ui);
     }
 
-    /* ── Zones ─────────────────────────────────────── */
+    /* ── Zones (top/bottom strips, landscape) ───────── */
     .zone {
       flex: 1; min-height: 0;
       display: flex; flex-direction: column; align-items: stretch;
       overflow: hidden;
-      transition: background-color 0.25s;
+      background: #000;                          /* inactive = black */
+      transition: background 0.45s ease, box-shadow 0.45s ease;
       position: relative;
     }
+    #zone-p2 { transform: rotate(180deg); }
+    /* Active (priority) player lights up in their colour */
+    #zone-p1.active {
+      background: radial-gradient(ellipse at 50% 60%, #2a1552 0%, #0d0720 78%);
+      box-shadow: inset 0 0 90px rgba(120,70,220,0.18);
+    }
+    #zone-p2.active {
+      background: radial-gradient(ellipse at 50% 60%, #103154 0%, #06121f 78%);
+      box-shadow: inset 0 0 90px rgba(60,140,220,0.18);
+    }
+    .zone.dead { background: rgba(50,0,0,0.6) !important; box-shadow: none !important; }
 
-    /* Life-change delta popup */
-    .life-num-wrap {
-      position: relative;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .life-popup {
-      position: absolute;
-      bottom: calc(100% + 6px);
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(10,10,22,0.88);
-      border: 2px solid rgba(255,255,255,0.18);
-      border-radius: 5px;
-      padding: 4px 14px;
-      font-size: clamp(16px, 5vw, 26px);
-      font-weight: 900;
-      letter-spacing: 1px;
-      pointer-events: none;
-      z-index: 20;
-      opacity: 0;
-      transition: opacity 0.25s;
-      white-space: nowrap;
-    }
-    .life-popup.show { opacity: 1; }
-    #zone-p1 { background: var(--p1-bg); }
-    #zone-p2 { background: var(--p2-bg); transform: rotate(180deg); }
-    .zone.active  { background-color: var(--active) !important; }
-    @keyframes danger {
-      0%,100% { background-color: rgba(220,30,30,0.12); }
-      50%      { background-color: rgba(220,30,30,0.50); }
-    }
-    .zone.danger { animation: danger 0.7s ease-in-out infinite !important; }
-
-    /* ── Zone inner: [adj] [center] [adj] ───────────── */
+    /* Inner row: [−] [center] [+] */
     .zone-inner {
       flex: 1; min-height: 0;
       display: flex; flex-direction: row; align-items: stretch;
     }
-
-    /* Full-height life buttons — wider, outline style */
     .adj {
-      flex: 0 0 145px;
-      background: transparent;
-      border: none;
-      color: var(--text);
-      font-size: clamp(38px, 11vw, 58px);
-      font-weight: 300;
+      flex: 0 0 22%; max-width: 200px;
+      background: transparent; border: none; color: var(--text);
+      font-size: clamp(30px, 8vh, 52px); font-weight: 300;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.1s;
     }
     .adj:first-child { border-right: 1px solid rgba(255,255,255,0.12); }
     .adj:last-child  { border-left:  1px solid rgba(255,255,255,0.12); }
-    .adj:active { background: rgba(255,255,255,0.1); }
+    .adj:active { background: rgba(255,255,255,0.12); }
 
-    /* Center column — no player label */
     .zone-center {
-      flex: 1; min-width: 0;
-      position: relative;
+      flex: 1; min-width: 0; position: relative;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      gap: 4px; padding: 6px 4px;
+      gap: 2px; padding: 2px 4px;
     }
-    .turn-badge {
-      display: none;
-      font-size: 10px; font-weight: 800;
-      letter-spacing: 1.5px; text-transform: uppercase;
-      color: #000; background: var(--gold);
-      padding: 3px 8px; border-radius: 20px;
+    .turn-count {
+      position: absolute; top: 4px; left: 8px;
+      font-family: var(--font-disp);
+      font-size: clamp(10px, 2.2vh, 14px); font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase;
+      color: var(--gold); opacity: 0.65; pointer-events: none;
     }
-    .zone.myturn .turn-badge { display: inline-block; }
+
+    /* Life delta popup */
+    .life-num-wrap { position: relative; display: flex; align-items: center; justify-content: center; }
+    .life-popup {
+      position: absolute; bottom: calc(100% + 4px); left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10,10,22,0.9);
+      border: 2px solid rgba(255,255,255,0.18);
+      border-radius: 5px; padding: 2px 12px;
+      font-size: clamp(14px, 3.4vh, 22px); font-weight: 900; letter-spacing: 1px;
+      pointer-events: none; z-index: 20; opacity: 0;
+      transition: opacity 0.25s; white-space: nowrap;
+    }
+    .life-popup.show { opacity: 1; }
 
     .life-num {
-      font-size: clamp(66px, 21vw, 110px);
-      font-weight: 900; line-height: 1;
-      color: #fff;
-      text-shadow: 0 0 28px rgba(255,255,255,0.18);
-      font-variant-numeric: tabular-nums;
-      overflow: visible;
+      font-family: var(--font-disp);
+      font-size: clamp(44px, 15vh, 86px); font-weight: 900; line-height: 1;
+      color: #fff; text-shadow: 0 0 24px rgba(255,255,255,0.20);
+      font-variant-numeric: tabular-nums; overflow: visible;
     }
-    .clock {
-      font-size: clamp(18px, 5.5vw, 34px);
-      font-weight: 600; letter-spacing: 3px;
-      color: var(--muted); font-variant-numeric: tabular-nums;
-      transition: color 0.25s;
-    }
-    .zone.active .clock { color: #3dff8f; }
-    .clock.expired {
-      font-size: clamp(11px, 3.5vw, 18px) !important;
-      letter-spacing: 1px; color: var(--red) !important;
+    .life-num.shake      { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97); }
+    .life-num.shake.dmg  { color: #ff5b5b; text-shadow: 0 0 26px rgba(255,60,60,0.6); }
+    .life-num.shake.heal { color: #5bff9a; text-shadow: 0 0 26px rgba(60,255,140,0.6); }
+    @keyframes shake {
+      0%,100% { transform: translateX(0) scale(1); }
+      15%     { transform: translateX(-7px) scale(1.12); }
+      30%     { transform: translateX(6px)  scale(1.12); }
+      45%     { transform: translateX(-5px) scale(1.06); }
+      60%     { transform: translateX(4px); }
+      80%     { transform: translateX(-2px); }
     }
 
-    /* ── Bottom button row: [Pass Priority] [F6] ─────── */
+    .clock {
+      font-family: var(--font-mono);
+      font-size: clamp(13px, 3.2vh, 22px); font-weight: 600; letter-spacing: 2px;
+      color: var(--muted); font-variant-numeric: tabular-nums;
+      padding: 1px 9px; border-radius: 6px; transition: color 0.25s;
+    }
+    .zone.active .clock { color: #3dff8f; }
+    /* Time-pressure escalation (active running clock only) */
+    .clock.breathing { animation: breathe 7s ease-in-out infinite; }
+    .clock.warn      { color: #ff4040 !important; font-weight: 800; }
+    .clock.critical  { color: #ff2020 !important; font-weight: 800; animation: clockBlink 0.75s ease-in-out infinite; }
+    .clock.flash     { animation: clockFlash 0.6s ease; }
+    @keyframes breathe {
+      0%,100% { opacity: 1;    color: #e2fff0; }
+      50%     { opacity: 0.62; color: #8b97a3; }
+    }
+    @keyframes clockBlink { 0%,100% { opacity: 1; } 50% { opacity: 0.1; } }
+    @keyframes clockFlash {
+      0%   { background: rgba(233,69,96,0); }
+      35%  { background: rgba(233,69,96,0.6); }
+      100% { background: rgba(233,69,96,0); }
+    }
+    .clock.expired {
+      font-size: clamp(10px, 2.4vh, 15px) !important;
+      letter-spacing: 1px; color: var(--red) !important;
+      animation: clockBlink 0.75s ease-in-out infinite;
+    }
+
+    /* ── Priority button row: [Pass] [Cast] [F6] ─────── */
     .btn-row {
       display: flex; align-items: stretch; flex-shrink: 0;
       border-top: 1px solid rgba(255,255,255,0.07);
-      min-height: 80px;
+      height: clamp(42px, 9vh, 58px);
     }
-
-    /* Large square-ish pass button */
     .pass-btn {
       flex: 1;
       background: linear-gradient(135deg, #e94560, #b52a40);
       border: none; color: white;
-      font-size: clamp(13px, 3.8vw, 18px);
-      font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase;
-      cursor: pointer;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+      font-size: clamp(11px, 2.2vh, 15px);
+      font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+      cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
       transition: filter 0.12s;
     }
+    .pass-btn.start { background: linear-gradient(135deg, #2bb673, #1c8a55); }
     .pass-btn:not(.waiting):active { filter: brightness(1.25); }
     .pass-btn.waiting {
-      background: rgba(255,255,255,0.06);
-      color: rgba(255,255,255,0.25);
+      background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.22);
       box-shadow: none; pointer-events: none;
     }
-
-    /* Small F6 button */
+    .cast-btn {
+      flex: 0 0 30%; max-width: 200px;
+      background: linear-gradient(135deg, #3a86d4, #245fa0);
+      border: none; border-left: 1px solid rgba(255,255,255,0.12);
+      color: white; font-size: clamp(11px, 2.2vh, 15px);
+      font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+      cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+      transition: filter 0.12s;
+    }
+    .cast-btn:not(.waiting):active { filter: brightness(1.25); }
+    .cast-btn.waiting {
+      background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.22);
+      box-shadow: none; pointer-events: none;
+    }
     .f6-btn {
-      flex: 0 0 56px;
+      flex: 0 0 52px;
       background: rgba(255,255,255,0.05);
       border: none; border-left: 1px solid rgba(255,255,255,0.09);
-      color: rgba(255,255,255,0.4);
-      font-size: 15px; font-weight: 900; letter-spacing: 1px;
-      cursor: pointer;
+      color: rgba(255,255,255,0.45);
+      font-size: 14px; font-weight: 900; letter-spacing: 1px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.12s, color 0.12s;
     }
-    .f6-btn:active  { background: rgba(255,255,255,0.14); }
-    .f6-btn.on      { color: var(--gold); background: rgba(212,175,55,0.1); border-left-color: rgba(212,175,55,0.3); }
-    .f6-btn.gone    { opacity: 0.12; pointer-events: none; }
+    .f6-btn:active { background: rgba(255,255,255,0.14); }
+    .f6-btn.on { color: var(--gold); background: rgba(212,175,55,0.12); border-left-color: rgba(212,175,55,0.3); }
+    .hidden { display: none !important; }
+    /* Themed serif font on all action buttons (was falling back to UA sans-serif) */
+    .adj, .pass-btn, .cast-btn, .f6-btn, .combat-y, .combat-n,
+    .phase-seg, .ctrl-btn, .stack-ind, .chip {
+      font-family: var(--font-disp);
+    }
 
-    /* ── Middle ribbon — single line ─────────────────── */
+    /* ── Middle ribbon: phase track + controls ───────── */
     .mid {
-      flex: 0 0 auto;
-      background: var(--mid-bg);
-      display: flex; flex-direction: row;
-      align-items: center; gap: 5px;
-      padding: 5px 10px;
-      border-top:    1px solid rgba(255,255,255,0.05);
-      border-bottom: 1px solid rgba(255,255,255,0.05);
+      flex: 0 0 auto; background: var(--mid-bg);
+      display: flex; flex-direction: row; align-items: center; gap: 8px;
+      padding: 5px 8px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      transform-origin: center;
+      transition: opacity 0.15s ease;
     }
-    .pnav {
-      flex: 0 0 32px; height: 32px;
-      background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.12);
-      color: var(--text); border-radius: 7px;
-      font-size: 13px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
+    .mid.flip { transform: rotate(180deg); }   /* face whoever's turn it is (snaps while faded out) */
+    .phase-track {
+      position: relative;
+      flex: 1; display: flex; align-items: stretch;
+      background: #100d1a;
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 7px; overflow: hidden;
     }
-    .pnav:active { background: rgba(255,255,255,0.2); }
-    #phase-lbl {
-      flex: 1;
-      text-align: center;
-      font-size: clamp(10px, 2.8vw, 13px); font-weight: 800;
-      color: var(--gold); letter-spacing: 1px; text-transform: uppercase;
-      background: rgba(212,175,55,0.09);
-      border: 1px solid rgba(212,175,55,0.26);
-      padding: 5px 8px; border-radius: 7px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    /* The gold highlight that slides between phases */
+    .phase-slider {
+      position: absolute; top: 0; bottom: 0; left: 0; width: 0;
+      background: var(--gold); z-index: 0; pointer-events: none;
+      box-shadow: inset 0 0 16px rgba(255,255,255,0.22);
+      transition: left 0.2s cubic-bezier(.4,0,.2,1), width 0.2s cubic-bezier(.4,0,.2,1);
     }
+    .phase-seg {
+      position: relative; z-index: 1;
+      flex: 1 1 0; min-width: 0;
+      background: transparent; border: none;
+      border-right: 1px solid rgba(255,255,255,0.08);   /* tile divider */
+      color: var(--muted);
+      font-size: clamp(9px, 1.9vh, 12px); font-weight: 700;
+      letter-spacing: 0.5px; text-transform: uppercase;
+      padding: 7px 4px; cursor: pointer; white-space: nowrap;
+      text-overflow: ellipsis; overflow: hidden;
+      transition: color 0.18s ease;
+    }
+    .phase-seg:last-child { border-right: none; }
+    .phase-seg.done { color: rgba(255,255,255,0.26); }
+    .phase-seg.on   { color: #1a1205; }                 /* dark text over the gold slider */
+    .phase-seg:active { background: rgba(255,255,255,0.05); }
+
+    .mid-ctrls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .stack-ind {
+      display: none; align-items: center; gap: 3px;
+      font-size: 12px; font-weight: 800; color: var(--blue);
+      background: rgba(47,122,209,0.14); border: 1px solid rgba(47,122,209,0.4);
+      border-radius: 6px; padding: 5px 9px; white-space: nowrap;
+    }
+    .stack-ind.show { display: inline-flex; }
     .ctrl-btn {
-      flex: 0 0 32px; height: 32px;
+      flex: 0 0 34px; height: 34px;
       background: rgba(255,255,255,0.07);
       border: 1px solid rgba(255,255,255,0.12);
       color: rgba(255,255,255,0.6); border-radius: 7px;
-      font-size: 14px; cursor: pointer;
+      font-size: 15px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
     }
     .ctrl-btn:active { background: rgba(255,255,255,0.2); }
@@ -217,67 +268,100 @@
     /* ── Overlays ────────────────────────────────────── */
     .overlay {
       display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,0.80); z-index: 100;
-      align-items: center; justify-content: center; padding: 20px;
+      background: rgba(0,0,0,0.82); z-index: 100;
+      align-items: center; justify-content: center; padding: 16px;
     }
     .overlay.open { display: flex; }
+    #combat-ov.flip .modal { transform: rotate(180deg); }   /* combat box faces the turn player */
     .modal {
-      background: #1a1a2e;
+      background: linear-gradient(160deg, #161020 0%, #09060f 100%);
+      border: 1px solid rgba(212,175,55,0.28);
+      border-radius: 18px; padding: 18px 22px 16px;
+      width: 100%; max-width: 480px; max-height: 96vh; overflow-y: auto;
+      box-shadow: 0 18px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .modal-title {
+      font-family: var(--font-disp); font-size: 21px; font-weight: 900;
+      color: var(--gold); text-align: center; letter-spacing: 2px;
+      padding-bottom: 11px; margin-bottom: 14px;
+      border-bottom: 1px solid rgba(212,175,55,0.22);
+      text-shadow: 0 0 18px rgba(212,175,55,0.35);
+    }
+    .grp { margin-bottom: 14px; }
+    .grp-lbl {
+      font-family: var(--font-disp); font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 2px; text-align: center;
+      color: var(--gold); opacity: 0.82; margin-bottom: 10px;
+    }
+    .chips {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+      background: rgba(255,255,255,0.12);          /* shows as 1px grid lines */
       border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 18px; padding: 26px 22px;
-      width: 100%; max-width: 370px; max-height: 88vh; overflow-y: auto;
+      border-radius: 8px; overflow: hidden;
     }
-    .modal-title { font-size: 19px; font-weight: 800; color: var(--gold); text-align: center; margin-bottom: 22px; }
-    .grp { margin-bottom: 20px; }
-    .grp-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 9px; }
-    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip {
-      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14);
-      color: var(--text); padding: 9px 18px; border-radius: 30px;
-      font-size: 15px; cursor: pointer; transition: all 0.12s;
+      background: #1b1526; border: none; color: var(--text);
+      padding: 12px 8px; font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: background 0.15s, color 0.15s;
     }
-    .chip.on { background: var(--red); border-color: var(--red); }
+    .chip.wide { grid-column: 1 / -1; }            /* Custom spans the full row */
+    .chip:active { filter: brightness(1.3); }
+    .chip.on {
+      background: var(--gold); color: #1a1205;
+      box-shadow: inset 0 0 18px rgba(255,255,255,0.25);
+    }
     .custom-inp {
-      width: 100%; background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.18); color: var(--text);
-      padding: 10px 14px; border-radius: 10px; font-size: 16px;
-      margin-top: 9px; display: none;
+      width: 100%; background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(212,175,55,0.3); color: var(--text);
+      padding: 11px 14px; border-radius: 8px; font-size: 16px;
+      font-family: var(--font-ui);
+      margin-top: 10px; display: none;
     }
+    .custom-inp:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(212,175,55,0.2); }
+    .row2 { display: flex; gap: 12px; }
+    .row2 > * { flex: 1; }
     .btn-primary {
-      width: 100%; padding: 15px; background: var(--red);
-      border: none; color: white; font-size: 16px; font-weight: 800;
-      border-radius: 12px; cursor: pointer; text-transform: uppercase;
-      letter-spacing: 1px; margin-top: 4px;
+      width: 100%; padding: 14px;
+      background: linear-gradient(135deg, #e6c14e, #b8902a);
+      border: none; color: #1a1205;
+      font-family: var(--font-disp); font-size: 15px; font-weight: 900;
+      border-radius: 10px; cursor: pointer; text-transform: uppercase;
+      letter-spacing: 1.5px; margin-top: 6px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
     }
+    .btn-primary:active { filter: brightness(1.1); }
     .btn-ghost {
-      width: 100%; padding: 13px; background: rgba(255,255,255,0.07);
-      border: none; color: var(--text); font-size: 15px; font-weight: 600;
-      border-radius: 12px; cursor: pointer; margin-top: 8px;
+      width: 100%; padding: 12px; background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--muted); font-size: 14px; font-weight: 600;
+      font-family: var(--font-ui);
+      border-radius: 10px; cursor: pointer; margin-top: 9px;
     }
-    .combat-row { display: flex; align-items: stretch; gap: 14px; min-height: 110px; }
+    .btn-ghost:active { background: rgba(255,255,255,0.1); }
+    .combat-row { display: flex; align-items: stretch; gap: 14px; min-height: 96px; }
     .combat-mid {
       flex: 1; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 6px; text-align: center;
     }
-    .combat-title { font-size: 17px; font-weight: 800; color: var(--gold); }
+    .combat-title { font-family: var(--font-disp); font-size: 18px; font-weight: 900; color: var(--gold); letter-spacing: 1px; }
     .combat-q     { color: var(--muted); font-size: 13px; line-height: 1.4; }
     .combat-y, .combat-n {
       flex: 0 0 80px; border: none; border-radius: 14px;
       font-size: 22px; font-weight: 900; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
     }
-    .combat-y { background: var(--red); color: white; }
-    .combat-n { background: rgba(255,255,255,0.12); color: var(--text); }
+    .combat-y { background: linear-gradient(135deg, #2bb673, #1c8a55); color: white; }
+    .combat-n { background: linear-gradient(135deg, #e94560, #b52a40); color: white; }
   </style>
 </head>
 <body>
 
-  <!-- P2 zone — btn-row is last child → physical top after rotation -->
+  <!-- P2 zone (rotated 180°): btn-row last child → physical top edge -->
   <div class="zone" id="zone-p2">
     <div class="zone-inner">
       <button class="adj" onclick="adj(1,-1)">−</button>
       <div class="zone-center">
-        <span class="turn-badge">Active Turn</span>
+        <div class="turn-count" id="turn-p2">Turn 0</div>
         <div class="life-num-wrap">
           <div class="life-popup" id="popup-p2"></div>
           <div class="life-num" id="life-p2">20</div>
@@ -287,27 +371,29 @@
       <button class="adj" onclick="adj(1,+1)">+</button>
     </div>
     <div class="btn-row">
-      <button class="pass-btn waiting" id="pass-btn-p2" onclick="pressPriority(1)">Waiting...</button>
-      <button class="f6-btn gone"      id="f6-p2"       onclick="pressF6(1)">F6</button>
+      <button class="pass-btn start" id="pass-btn-p2" onclick="onPass(1)">Start Game</button>
+      <button class="cast-btn hidden" id="cast-btn-p2" onclick="onCast(1)">Cast</button>
+      <button class="f6-btn hidden"   id="f6-p2"       onclick="onF6(1)">F6</button>
     </div>
   </div>
 
-  <!-- Middle ribbon — single line -->
+  <!-- Middle ribbon -->
   <div class="mid">
-    <button class="pnav" onclick="prevPhase()">◀</button>
-    <div id="phase-lbl">Untap / Upkeep / Draw</div>
-    <button class="pnav" onclick="nextPhase()">▶</button>
-    <button class="ctrl-btn" id="pause-btn"    onclick="togglePause()">⏸</button>
-    <button class="ctrl-btn" id="reset-btn"    onclick="resetGame()">↺</button>
-    <button class="ctrl-btn" id="settings-btn" onclick="openSettings()">⚙</button>
+    <div class="phase-track" id="phase-track"></div>
+    <div class="mid-ctrls">
+      <span class="stack-ind" id="stack-ind"></span>
+      <button class="ctrl-btn" id="pause-btn"    onclick="togglePause()">⏸</button>
+      <button class="ctrl-btn" id="reset-btn"    onclick="resetGame()">↺</button>
+      <button class="ctrl-btn" id="settings-btn" onclick="openSettings()">⚙</button>
+    </div>
   </div>
 
-  <!-- P1 zone — btn-row last → physical bottom -->
+  <!-- P1 zone: btn-row last → physical bottom edge -->
   <div class="zone" id="zone-p1">
     <div class="zone-inner">
       <button class="adj" onclick="adj(0,-1)">−</button>
       <div class="zone-center">
-        <span class="turn-badge">Active Turn</span>
+        <div class="turn-count" id="turn-p1">Turn 0</div>
         <div class="life-num-wrap">
           <div class="life-popup" id="popup-p1"></div>
           <div class="life-num" id="life-p1">20</div>
@@ -317,8 +403,9 @@
       <button class="adj" onclick="adj(0,+1)">+</button>
     </div>
     <div class="btn-row">
-      <button class="pass-btn" id="pass-btn-p1" onclick="pressPriority(0)">Start Game</button>
-      <button class="f6-btn gone" id="f6-p1"    onclick="pressF6(0)">F6</button>
+      <button class="pass-btn start" id="pass-btn-p1" onclick="onPass(0)">Start Game</button>
+      <button class="cast-btn hidden" id="cast-btn-p1" onclick="onCast(0)">Cast</button>
+      <button class="f6-btn hidden"   id="f6-p1"       onclick="onF6(0)">F6</button>
     </div>
   </div>
 
@@ -326,25 +413,25 @@
   <div class="overlay" id="settings-ov" onclick="bgClose(event,'settings-ov')">
     <div class="modal" onclick="event.stopPropagation()">
       <div class="modal-title">⚙ Settings</div>
-      <div class="grp">
-        <div class="grp-lbl">Starting Life Total</div>
-        <div class="chips">
-          <button class="chip on" data-life="20" onclick="pickLife(20,this)">20</button>
-          <button class="chip"    data-life="30" onclick="pickLife(30,this)">30</button>
-          <button class="chip"    data-life="40" onclick="pickLife(40,this)">40</button>
-          <button class="chip"    data-life="0"  onclick="pickLife(0,this)">Custom</button>
+      <div class="row2">
+        <div class="grp">
+          <div class="grp-lbl">Starting Life</div>
+          <div class="chips">
+            <button class="chip on"   data-life="20" onclick="pickLife(20,this)">20</button>
+            <button class="chip"      data-life="40" onclick="pickLife(40,this)">40</button>
+            <button class="chip wide" data-life="0"  onclick="pickLife(0,this)">Custom</button>
+          </div>
+          <input id="inp-life" class="custom-inp" type="number" min="1" max="999" placeholder="e.g. 25">
         </div>
-        <input id="inp-life" class="custom-inp" type="number" min="1" max="999" placeholder="e.g. 25">
-      </div>
-      <div class="grp">
-        <div class="grp-lbl">Time Per Player</div>
-        <div class="chips">
-          <button class="chip"    data-min="3"  onclick="pickTime(3,this)">3 min</button>
-          <button class="chip on" data-min="5"  onclick="pickTime(5,this)">5 min</button>
-          <button class="chip"    data-min="10" onclick="pickTime(10,this)">10 min</button>
-          <button class="chip"    data-min="0"  onclick="pickTime(0,this)">Custom</button>
+        <div class="grp">
+          <div class="grp-lbl">Time Per Player</div>
+          <div class="chips">
+            <button class="chip on"   data-min="5"  onclick="pickTime(5,this)">5m</button>
+            <button class="chip"      data-min="10" onclick="pickTime(10,this)">10m</button>
+            <button class="chip wide" data-min="0"  onclick="pickTime(0,this)">Custom</button>
+          </div>
+          <input id="inp-time" class="custom-inp" type="number" min="1" max="120" placeholder="Minutes">
         </div>
-        <input id="inp-time" class="custom-inp" type="number" min="1" max="120" placeholder="Minutes">
       </div>
       <button class="btn-primary" onclick="applySettings()">Apply &amp; Reset Game</button>
       <button class="btn-ghost"   onclick="closeSettings()">Cancel</button>
@@ -366,73 +453,75 @@
   </div>
 
   <script>
-    const BASE    = ["Untap / Upkeep / Draw","First Main","Combat","Second Main","End Step"];
-    const LOW_MS  = 30_000;
-    const AUTO_MS = 220;
+    // Internal phase ids (combat sub-steps inserted dynamically)
+    const BASE  = ["Untap / Upkeep / Draw","First Main","Combat","Second Main","End Step"];
+    const SHORT = {
+      "Untap / Upkeep / Draw": "Upkeep",
+      "First Main":            "Main 1",
+      "Combat":                "Combat",
+      "Declare Attackers":     "ATK",
+      "Declare Blockers":      "BLK",
+      "Damage":                "DMG",
+      "Second Main":           "Main 2",
+      "End Step":              "End",
+    };
+    const COMBAT_SUB = ["Declare Attackers","Declare Blockers","Damage"];
+    const BREATHE_MS = 120_000;  // ≤ 2:00 → breathing
+    const WARN_MS    = 60_000;   // ≤ 1:00 → solid red
+    const CRIT_MS    = 30_000;   // ≤ 0:30 → blink
+    const AUTO_MS    = 220;
 
     let cfg = { life: 20, secs: 300 };
     let pl  = [{ life:20, ms:300_000 }, { life:20, ms:300_000 }];
 
-    let active        = -1;
-    let started       = false;
-    let paused        = false;
-    let raf           = null;
-    let lastT         = null;
-    let turnPlayer    = 0;
-    let passedOnce    = false;
-    let noInteraction = [false, false];
-    let f6Pressed     = [false, false]; // both true → skip to next turn
-    let phases        = [...BASE];
-    let phaseIdx      = 0;
+    let active     = -1;       // who holds priority (clock runs for them); -1 = none
+    let started    = false;
+    let paused     = false;
+    let raf        = null;
+    let lastT      = null;
+    let turnPlayer = 0;        // whose turn it is
+    let turnCount  = [0, 0];   // per-player turn number (increments when it becomes their turn)
+    let passes     = 0;        // consecutive priority passes since last cast / resolve / step change
+    let stack      = 0;        // items currently on the stack
+    let autoPass   = [false,false]; // F6 auto-pass per player
+    let phases     = [...BASE];
+    let phaseIdx   = 0;
     let pLife = 20, pMin = 5;
+    let shownLife  = [20, 20];   // displayed life (lags behind until damage commits)
+    let lastMin    = [5, 5];     // last whole-minute value seen per clock (for minute flash)
+    let _phaseSig  = '';         // dirty-check so the phase track only rebuilds on change
 
-    const inDamage = () => phases[phaseIdx] === 'Damage';
+    const dead = () => pl[0].life === 0 || pl[1].life === 0;
+    const inDamage = () => started && phases[phaseIdx] === 'Damage';
 
     // ── Clock ─────────────────────────────────────────
     function tick(now) {
       if (active < 0 || paused) return;
       if (lastT !== null) {
         pl[active].ms = Math.max(0, pl[active].ms - (now - lastT));
-        renderClocks(); renderDanger();
+        renderClocks();
         if (pl[active].ms === 0) { haltClock(); renderAll(); return; }
       }
       lastT = now;
       raf = requestAnimationFrame(tick);
     }
-
-    function startClock(idx) {
-      if (raf) cancelAnimationFrame(raf);
-      active = idx; lastT = null; paused = false;
-      raf = requestAnimationFrame(tick);
-      renderAll();
-
-      if (!started) return;
-
-      // Turn player pressed F6 → auto-pass their priority every time they receive it
-      if (f6Pressed[idx] && idx === turnPlayer && !passedOnce) {
-        setTimeout(() => {
-          if (active === idx && f6Pressed[idx] && idx === turnPlayer && !passedOnce && !paused) {
-            passedOnce = true;
-            startClock(1 - turnPlayer);
-          }
-        }, AUTO_MS);
-        return;
-      }
-
-      // Non-turn player declared no interaction → auto-pass back when they receive priority
-      if (noInteraction[idx] && idx !== turnPlayer && passedOnce) {
-        setTimeout(() => {
-          if (active === idx && noInteraction[idx] && passedOnce && !paused) {
-            passedOnce = false;
-            advanceOrNewTurn();
-          }
-        }, AUTO_MS);
-      }
-    }
-
     function haltClock() {
       if (raf) cancelAnimationFrame(raf);
       raf = null; lastT = null; active = -1;
+    }
+
+    // Hand priority (and the running clock) to a player.
+    function setPriority(idx) {
+      if (raf) cancelAnimationFrame(raf);
+      active = idx; lastT = null;
+      if (started && !paused) raf = requestAnimationFrame(tick);
+      renderAll();
+      // F6 auto-pass: if this player has flagged "no interaction", pass for them.
+      if (started && !paused && autoPass[idx]) {
+        setTimeout(() => {
+          if (started && !paused && active === idx && autoPass[idx]) doPass(idx);
+        }, AUTO_MS);
+      }
     }
 
     // ── Pause ─────────────────────────────────────────
@@ -444,83 +533,108 @@
       renderAll();
     }
 
-    // ── Priority ──────────────────────────────────────
-    function pressPriority(playerIdx) {
-      if (paused) return;
-      if (pl[0].life === 0 || pl[1].life === 0) return;
-
-      if (!started) {
-        started = true; turnPlayer = playerIdx; passedOnce = false;
-        startClock(playerIdx); return;
-      }
-
-      // Damage phase: only turn player advances, no clock restart
-      if (inDamage()) {
-        if (playerIdx !== turnPlayer) return;
-        passedOnce = false; advanceOrNewTurn(); return;
-      }
-
-      if (active !== playerIdx) return; // only priority holder can pass
-
-      if (!passedOnce) { passedOnce = true;  startClock(1 - turnPlayer); }
-      else             { passedOnce = false; advanceOrNewTurn(); }
+    // ── Priority actions ──────────────────────────────
+    function onPass(idx) {
+      if (paused || dead()) return;
+      if (!started) { startGame(idx); return; }
+      if (inDamage()) { if (idx === turnPlayer) advanceStep(); return; }  // turn player ends the frozen damage step
+      doPass(idx);
     }
-
-    // F6: any player can press at any time.
-    // — Active (turn) player: passes their priority when they have it.
-    // — Non-active player: sets no-interaction and auto-passes if they hold priority.
-    // — Both pressed this turn → immediately skip to next turn.
-    function pressF6(playerIdx) {
-      if (paused || !started) return;
-      if (pl[0].life === 0 || pl[1].life === 0) return;
-      if (inDamage()) return;
-
-      f6Pressed[playerIdx] = true;
-
-      // Both players have pressed F6 → skip straight to next turn
-      if (f6Pressed[0] && f6Pressed[1]) {
-        f6Pressed     = [false, false];
-        noInteraction = [false, false];
-        passedOnce    = false;
-        newTurn();
-        return;
-      }
-
-      // Non-active player also gets the no-interaction auto-pass flag
-      if (playerIdx !== turnPlayer) {
-        noInteraction[playerIdx] = true;
-      }
-
-      // If this player currently holds priority, pass it now
-      if (active === playerIdx) {
-        if (!passedOnce) {
-          passedOnce = true;
-          startClock(1 - turnPlayer);
-        } else {
-          passedOnce = false;
-          advanceOrNewTurn();
-        }
-        return;
-      }
-
-      renderBtn();
+    function startGame(idx) {
+      started = true; turnPlayer = idx;
+      passes = 0; stack = 0; phases = [...BASE]; phaseIdx = 0;
+      autoPass = [false,false];
+      turnCount = [0, 0]; turnCount[idx] = 1;   // starter begins their turn 1
+      setPriority(idx);
     }
-
-    // ── Advance ───────────────────────────────────────
-    function advanceOrNewTurn() {
-      if (phaseIdx >= phases.length - 1) {
-        turnPlayer = 1 - turnPlayer;
-        noInteraction = [false, false];
-        f6Pressed     = [false, false];
-        phases = [...BASE]; phaseIdx = 0;
-        renderPhase(); startClock(turnPlayer);
+    function doPass(idx) {
+      if (!started || paused || dead()) return;
+      if (active !== idx) return;       // only the priority holder can pass
+      passes++;
+      if (passes >= 2) {                // both players passed in succession
+        passes = 0;
+        if (stack > 0) { stack--; setPriority(turnPlayer); }  // resolve top of stack
+        else           { advanceStep(); }                      // empty stack → next step
       } else {
-        const next = phases[phaseIdx + 1];
-        phaseIdx++; renderPhase();
-        if      (next === 'Combat')  { openCombat(); }
-        else if (next === 'Damage')  { haltClock(); renderAll(); } // freeze
-        else                         { startClock(turnPlayer); }
+        setPriority(1 - idx);           // hand priority to opponent
       }
+    }
+    // "Someone plays a card" → puts it on the stack; caster keeps priority.
+    function onCast(idx) {
+      if (!started || paused || dead()) return;
+      if (inDamage()) return;
+      if (active !== idx) return;
+      stack++;
+      passes = 0;
+      autoPass[idx] = false;            // they're interacting, clear any auto-pass
+      setPriority(idx);                 // caster retains priority
+    }
+    // F6 — toggle "no interaction / auto-pass". Both players on → jump to next turn.
+    function onF6(idx) {
+      if (!started || paused || dead()) return;
+      if (inDamage()) return;
+      autoPass[idx] = !autoPass[idx];
+      if (autoPass[0] && autoPass[1]) { autoPass = [false,false]; newTurn(); return; }
+      if (autoPass[idx] && active === idx) { doPass(idx); return; }
+      renderAll();
+    }
+
+    // ── Turn / step flow ──────────────────────────────
+    function advanceStep() {
+      stack = 0; passes = 0;
+      if (phaseIdx >= phases.length - 1) { newTurn(); return; }
+      const next = phases[phaseIdx + 1];
+      phaseIdx++;
+      renderPhase();
+      if      (next === 'Combat') openCombat();
+      else if (next === 'Damage') { haltClock(); renderAll(); }   // freeze clock for damage
+      else                        setPriority(turnPlayer);
+    }
+    function newTurn() {
+      turnPlayer = 1 - turnPlayer;
+      turnCount[turnPlayer]++;                  // it's now this player's next turn
+      autoPass = [false,false];
+      stack = 0; passes = 0;
+      phases = [...BASE]; phaseIdx = 0;
+      renderPhase();
+      if (started) setPriority(turnPlayer);
+      else         renderAll();
+    }
+    function goToPhase(i) {
+      if (i < 0 || i >= phases.length) return;
+      phaseIdx = i; stack = 0; passes = 0;
+      renderPhase();
+      if (!started) { renderAll(); return; }
+      if (phases[i] === 'Damage') { haltClock(); renderAll(); }   // frozen during damage
+      else                        setPriority(turnPlayer);
+    }
+
+    function openCombat() {
+      haltClock();
+      phases   = phases.filter(p => !COMBAT_SUB.includes(p));
+      phaseIdx = phases.indexOf('Combat');
+      renderPhase();
+      renderOrientation();
+      // Turn player has F6 (auto-pass) on → assume no attackers, skip the prompt.
+      if (autoPass[turnPlayer]) {
+        passes = 0; stack = 0;
+        setPriority(turnPlayer);
+        return;
+      }
+      document.getElementById('combat-ov').classList.add('open');
+    }
+    function resolveCombat(attackers) {
+      document.getElementById('combat-ov').classList.remove('open');
+      if (attackers) {
+        const ci = phases.indexOf('Combat');
+        phases.splice(ci + 1, 0, ...COMBAT_SUB);
+      }
+      // Begin at the Combat step itself, so beginning-of-combat triggers get a
+      // priority window before advancing to Declare Attackers.
+      phaseIdx = phases.indexOf('Combat');
+      passes = 0; stack = 0;
+      renderPhase();
+      if (started) setPriority(turnPlayer);
     }
 
     // ── Life ──────────────────────────────────────────
@@ -531,77 +645,42 @@
       const before = pl[idx].life;
       pl[idx].life  = Math.max(0, pl[idx].life + d);
       const actual  = pl[idx].life - before;
-      renderLife();
-      if (actual !== 0) {
-        lifeDelta[idx] += actual;
-        showDeltaPopup(idx);
-      }
-      if (pl[0].life === 0 || pl[1].life === 0) {
-        haltClock(); paused = false; renderAll();
+      // The big number stays put; only the delta popup moves while damage accumulates.
+      if (actual !== 0) { lifeDelta[idx] += actual; showDeltaPopup(idx); }
+      if (pl[idx].life === 0) {
+        commitLife(idx); haltClock(); paused = false; renderAll();
+      } else if (started && active < 0 && !dead() && pl[0].ms > 0 && pl[1].ms > 0) {
+        // A player was tapped to 0 (halting the game) and then brought back — resume play.
+        setPriority(turnPlayer);
       }
     }
-
+    // Push the accumulated delta into the displayed number, with a shake.
+    function commitLife(idx) {
+      if (deltaTimeout[idx]) { clearTimeout(deltaTimeout[idx]); deltaTimeout[idx] = null; }
+      const gained = pl[idx].life - shownLife[idx];
+      shownLife[idx] = pl[idx].life;
+      const num = document.getElementById(`life-p${idx + 1}`);
+      num.textContent = shownLife[idx];
+      num.classList.remove('shake', 'dmg', 'heal');
+      void num.offsetWidth;                                  // restart the animation
+      if (gained !== 0) num.classList.add('shake', gained < 0 ? 'dmg' : 'heal');
+      setTimeout(() => num.classList.remove('shake', 'dmg', 'heal'), 520);
+      document.getElementById(`popup-p${idx + 1}`).classList.remove('show');
+      lifeDelta[idx] = 0;
+    }
     function showDeltaPopup(idx) {
       const el = document.getElementById(`popup-p${idx + 1}`);
-      const d  = lifeDelta[idx];
-      el.textContent = d > 0 ? `+${d}` : `${d}`;
+      const v  = lifeDelta[idx];
+      el.textContent = v > 0 ? `+${v}` : `${v}`;
       el.className   = 'life-popup show';
-      // Interpolate color: damage → #FF8888 to #FF0000; gain → #8888FF to #0000FF
-      const ratio = Math.min(Math.abs(d), 20) / 20;
-      const ch    = Math.round(255 * (1 - ratio)); // 255→0 as intensity grows
-      const color = d > 0
-        ? `rgb(${ch},255,${ch})`   // green family for gain
-        : d < 0
-        ? `rgb(255,${ch},${ch})`   // red family for damage
-        : '#888';
-      el.style.color       = color;
-      el.style.borderColor = color;
+      const ratio = Math.min(Math.abs(v), 20) / 20;       // saturate by 20 in one popup
+      const ch    = Math.round(255 * (1 - ratio));        // white → full color
+      const color = v > 0 ? `rgb(${ch},255,${ch})`        // gain → green
+                  : v < 0 ? `rgb(255,${ch},${ch})`        // loss → red
+                  : '#888';
+      el.style.color = color; el.style.borderColor = color;
       if (deltaTimeout[idx]) clearTimeout(deltaTimeout[idx]);
-      deltaTimeout[idx] = setTimeout(() => {
-        el.classList.remove('show');
-        setTimeout(() => { lifeDelta[idx] = 0; }, 280);
-      }, 3000);
-    }
-
-    // ── Phases ────────────────────────────────────────
-    function prevPhase() {
-      if (phaseIdx > 0) {
-        phaseIdx--; passedOnce = false; renderPhase();
-        if (started) startClock(turnPlayer);
-      }
-    }
-    function nextPhase() {
-      if (phaseIdx >= phases.length - 1) { newTurn(); return; }
-      const next = phases[phaseIdx + 1];
-      phaseIdx++; passedOnce = false; renderPhase();
-      if      (next === 'Combat') { openCombat(); }
-      else if (next === 'Damage') { haltClock(); renderAll(); }
-      else if (started)           { startClock(turnPlayer); }
-    }
-    function newTurn() {
-      turnPlayer = 1 - turnPlayer;
-      noInteraction = [false, false];
-      f6Pressed     = [false, false];
-      phases = [...BASE]; phaseIdx = 0; passedOnce = false;
-      renderPhase();
-      if (started) startClock(turnPlayer);
-    }
-
-    function openCombat() {
-      haltClock();
-      phases   = phases.filter(p => p !== 'Declare Attackers' && p !== 'Declare Blockers' && p !== 'Damage');
-      phaseIdx = phases.indexOf('Combat');
-      document.getElementById('combat-ov').classList.add('open');
-    }
-    function resolveCombat(attackers) {
-      document.getElementById('combat-ov').classList.remove('open');
-      if (attackers) {
-        const ci = phases.indexOf('Combat');
-        phases.splice(ci + 1, 0, 'Declare Attackers', 'Declare Blockers', 'Damage');
-        phaseIdx = ci + 1; // jump to Declare Attackers
-      }
-      renderPhase();
-      if (started) startClock(turnPlayer);
+      deltaTimeout[idx] = setTimeout(() => commitLife(idx), 2000);
     }
 
     // ── Settings ──────────────────────────────────────
@@ -628,14 +707,17 @@
     }
     function resetGame() {
       haltClock();
-      started=false; paused=false; active=-1;
-      turnPlayer=0; passedOnce=false; noInteraction=[false,false]; f6Pressed=[false,false];
-      pl=[{life:cfg.life,ms:cfg.secs*1000},{life:cfg.life,ms:cfg.secs*1000}];
-      phases=[...BASE]; phaseIdx=0;
-      lifeDelta=[0,0];
-      deltaTimeout.forEach(t => { if(t) clearTimeout(t); });
-      deltaTimeout=[null,null];
+      started = false; paused = false; active = -1;
+      turnPlayer = 0; passes = 0; stack = 0; autoPass = [false,false]; turnCount = [0, 0]; _lastFlip = false;
+      pl = [{life:cfg.life, ms:cfg.secs*1000}, {life:cfg.life, ms:cfg.secs*1000}];
+      phases = [...BASE]; phaseIdx = 0; _phaseSig = '';
+      lifeDelta = [0,0];
+      shownLife = [cfg.life, cfg.life];
+      lastMin   = [Math.ceil(cfg.secs/60), Math.ceil(cfg.secs/60)];
+      deltaTimeout.forEach(t => { if (t) clearTimeout(t); });
+      deltaTimeout = [null,null];
       document.querySelectorAll('.life-popup').forEach(el => el.classList.remove('show'));
+      document.querySelectorAll('.life-num').forEach(el => el.classList.remove('shake','dmg','heal'));
       renderAll();
     }
 
@@ -645,70 +727,132 @@
       return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
     }
     function renderLife() {
-      document.getElementById('life-p1').textContent = pl[0].life;
-      document.getElementById('life-p2').textContent = pl[1].life;
+      document.getElementById('life-p1').textContent = shownLife[0];
+      document.getElementById('life-p2').textContent = shownLife[1];
+    }
+    function renderTurns() {
+      document.getElementById('turn-p1').textContent = 'Turn ' + turnCount[0];
+      document.getElementById('turn-p2').textContent = 'Turn ' + turnCount[1];
+    }
+    // Ribbon + combat box face the turn player (P2 → rotate 180°). Tied to turnPlayer,
+    // not active, so it never flips when priority is merely passed.
+    let _lastFlip = false;
+    function renderOrientation() {
+      const flip = turnPlayer === 1;
+      document.getElementById('combat-ov').classList.toggle('flip', flip);
+      const mid = document.querySelector('.mid');
+      if (flip !== _lastFlip) {                 // turn changed → quick fade, no visible spin
+        _lastFlip = flip;
+        mid.style.opacity = '0';
+        setTimeout(() => { mid.classList.toggle('flip', flip); mid.style.opacity = '1'; }, 150);
+      } else {
+        mid.classList.toggle('flip', flip);
+        mid.style.opacity = '1';
+      }
     }
     function renderClocks() {
       for (const [i, id] of [[0,'clock-p1'],[1,'clock-p2']]) {
         const el = document.getElementById(id);
-        if (started && pl[i].ms === 0) { el.textContent = 'TIME EXPIRED'; el.classList.add('expired'); }
-        else                           { el.textContent = fmt(pl[i].ms);   el.classList.remove('expired'); }
+        const ms = pl[i].ms;
+        if (started && ms === 0) { el.textContent = 'TIME EXPIRED'; el.classList.add('expired'); }
+        else                     { el.textContent = fmt(ms);        el.classList.remove('expired'); }
+
+        // Pressure escalation applies only to the live (active, running) clock.
+        el.classList.remove('breathing', 'warn', 'critical');
+        const live = started && !paused && active === i && ms > 0;
+        if (live) {
+          if      (ms <= CRIT_MS)    el.classList.add('critical');
+          else if (ms <= WARN_MS)    el.classList.add('warn');
+          else if (ms <= BREATHE_MS) el.classList.add('breathing');
+        }
+        // Quick red flash each time a whole minute ticks over (above the 1-min mark).
+        // ceil → fires AT the minute mark (4:00, 3:00…), not a second after, and no flash at start.
+        const cur = Math.ceil(ms / 60000);
+        if (live && cur < lastMin[i] && ms > WARN_MS) {
+          el.classList.add('flash');
+          setTimeout(() => el.classList.remove('flash'), 650);
+        }
+        lastMin[i] = cur;
       }
     }
-    function renderPhase() { document.getElementById('phase-lbl').textContent = phases[phaseIdx]; }
-    function renderDanger() {
-      for (const [i, id] of [[0,'zone-p1'],[1,'zone-p2']])
-        document.getElementById(id).classList.toggle(
-          'danger', active===i && pl[i].ms>0 && pl[i].ms<=LOW_MS && !paused);
+    function renderPhase() {
+      const track = document.getElementById('phase-track');
+      const arrSig = phases.join('|');
+      if (arrSig !== _phaseSig) {               // rebuild tiles only when the phase list changes
+        _phaseSig = arrSig;
+        track.innerHTML = '';
+        const slider = document.createElement('div');
+        slider.className = 'phase-slider';
+        slider.id = 'phase-slider';
+        track.appendChild(slider);
+        phases.forEach((p, i) => {
+          const b = document.createElement('button');
+          b.className = 'phase-seg';
+          b.textContent = SHORT[p] || p;
+          b.onclick = () => goToPhase(i);
+          track.appendChild(b);
+        });
+      }
+      const segs = track.querySelectorAll('.phase-seg');
+      segs.forEach((s, i) => {
+        s.classList.toggle('on',   i === phaseIdx);
+        s.classList.toggle('done', i < phaseIdx);
+      });
+      const cur = segs[phaseIdx];
+      const slider = document.getElementById('phase-slider');
+      if (cur && slider) {                      // slide the gold highlight to the active phase
+        slider.style.left  = cur.offsetLeft + 'px';
+        slider.style.width = cur.offsetWidth + 'px';
+      }
+      renderStack();
     }
-
-    function renderBtn() {
+    function renderStack() {
+      const si = document.getElementById('stack-ind');
+      si.textContent = `⛁ ${stack}`;
+      si.classList.toggle('show', stack > 0);
+    }
+    function renderButtons() {
       for (const i of [0, 1]) {
-        const passEl = document.getElementById(`pass-btn-p${i+1}`);
-        const f6El   = document.getElementById(`f6-p${i+1}`);
+        const pass = document.getElementById(`pass-btn-p${i+1}`);
+        const cast = document.getElementById(`cast-btn-p${i+1}`);
+        const f6   = document.getElementById(`f6-p${i+1}`);
 
         if (!started) {
-          passEl.textContent = 'Start Game';
-          passEl.classList.remove('waiting');
-          f6El.classList.add('gone'); f6El.classList.remove('on');
+          pass.textContent = 'Start Game'; pass.className = 'pass-btn start';
+          cast.classList.add('hidden'); f6.classList.add('hidden');
+          continue;
+        }
+        cast.classList.remove('hidden'); f6.classList.remove('hidden');
+
+        if (inDamage()) {                          // clock frozen; turn player ends the step
+          if (i === turnPlayer) { pass.className = 'pass-btn';         pass.textContent = 'Damage Assigned →'; }
+          else                  { pass.className = 'pass-btn waiting'; pass.textContent = 'Waiting…'; }
+          cast.className = 'cast-btn waiting';
+          f6.className   = 'f6-btn';
           continue;
         }
 
-        const damage      = inDamage();
-        const hasPriority = (active === i);
-        const isTurn      = (turnPlayer === i);
-
-        // Damage phase: only turn player sees "Damage Assigned"
-        if (damage) {
-          if (isTurn) { passEl.textContent = 'Damage Assigned'; passEl.classList.remove('waiting'); }
-          else        { passEl.textContent = 'Waiting...';      passEl.classList.add('waiting'); }
-          f6El.classList.add('gone'); f6El.classList.remove('on');
-          continue;
-        }
-
-        // Normal: pass button
-        if (hasPriority) {
-          const isLast = phaseIdx >= phases.length - 1;
-          passEl.textContent = !passedOnce ? 'Pass Priority'
-            : isLast ? 'Pass  →  End Turn' : 'Pass  →  Next Step';
-          passEl.classList.remove('waiting');
+        const hold = active === i && !paused;
+        if (hold) {
+          pass.className = 'pass-btn';
+          pass.textContent = passes >= 1
+            ? (stack > 0 ? 'Pass → Resolve' : 'Pass → Next Step')
+            : 'Pass Priority';
+          cast.className = 'cast-btn';
         } else {
-          passEl.textContent = 'Waiting...';
-          passEl.classList.add('waiting');
+          pass.className = 'pass-btn waiting'; pass.textContent = 'Waiting…';
+          cast.className = 'cast-btn waiting';
         }
-
-        // F6 — available to both players; lights up when pressed this turn
-        f6El.classList.remove('gone');
-        f6El.classList.toggle('on', f6Pressed[i]);
+        f6.className = 'f6-btn' + (autoPass[i] ? ' on' : '');
       }
     }
-
     function renderActive() {
       for (const [i, id] of [[0,'zone-p1'],[1,'zone-p2']]) {
-        document.getElementById(id).classList.toggle('active',  active===i && !paused);
-        document.getElementById(id).classList.toggle('myturn',  started && turnPlayer===i);
+        const el = document.getElementById(id);
+        el.classList.toggle('active', active === i && !paused);
+        el.classList.toggle('dead',   pl[i].life === 0);
       }
-      renderBtn(); renderDanger();
+      renderButtons();
     }
     function renderPauseBtn() {
       const b = document.getElementById('pause-btn');
@@ -716,28 +860,25 @@
       b.classList.toggle('paused', paused);
     }
     function renderAll() {
-      renderLife(); renderClocks(); renderPhase(); renderActive(); renderPauseBtn();
+      renderLife(); renderTurns(); renderClocks(); renderPhase(); renderActive(); renderPauseBtn(); renderOrientation();
     }
 
     // ── Wake Lock ─────────────────────────────────────
     let wakeLockSentinel = null;
     async function acquireWakeLock() {
-      try {
-        if ('wakeLock' in navigator) {
-          wakeLockSentinel = await navigator.wakeLock.request('screen');
-        }
-      } catch(_) {}
+      try { if ('wakeLock' in navigator) wakeLockSentinel = await navigator.wakeLock.request('screen'); }
+      catch(_) {}
     }
     acquireWakeLock();
-    // Re-acquire after tab becomes visible again (e.g. phone screen on)
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') acquireWakeLock();
     });
 
+    // Best-effort landscape lock (works in installed PWA)
+    try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(()=>{}); } catch(_) {}
+
     // ── Service Worker ────────────────────────────────
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
     renderAll();
   </script>
